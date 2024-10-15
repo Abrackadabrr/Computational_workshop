@@ -9,7 +9,7 @@ enum CellType {
   cut = 1,
   endocard = 2,
   epicard = 3,
-  central_line = 0,
+  central_line = -1,
 };
 
 }
