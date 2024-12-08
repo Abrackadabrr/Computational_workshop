@@ -20,4 +20,5 @@ Types::scalar norm_over_mesh(const Types::VectorXd &scalarField, INMOST::Mesh &m
     }
     return std::sqrt(result);
 }
+
 } // namespace Mesh::Utils

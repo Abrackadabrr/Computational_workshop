@@ -13,8 +13,7 @@ message(STATUS "DEFS: ${INMOST_DEFENITIONS}")
 message(STATUS "LIBS: ${INMOST_LIBRARIES}")
 message(STATUS "LIB_DIR: ${INMOST_LIBRARY_DIR}")
 
-add_library(${PROJECT_NAME} ${SOURCES}
-        mesh/MeshUtils.cpp)
+add_library(${PROJECT_NAME} ${SOURCES})
 
 target_compile_definitions(inmost PUBLIC ${INMOST_DEFINITIONS})
 target_link_directories(inmost INTERFACE ${INMOST_LIBRARY_DIRS})

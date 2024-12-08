@@ -9,9 +9,12 @@
 #include <complex>
 
 #include <Eigen/Sparse>
+#include <Eigen/Dense>
 
 namespace Types {
 
+using integer = int;
+using index = unsigned;
 using scalar = double;
 using complex = std::complex<double>;
 template <int N> using array_s = std::array<scalar, N>;

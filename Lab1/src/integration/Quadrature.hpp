@@ -10,8 +10,6 @@
 #include "mesh/MeshUtils.hpp"
 #include "types/BasicTypes.hpp"
 
-#include <inmost.h>
-
 namespace Math::Integration {
 namespace detail {
 
@@ -34,14 +32,9 @@ Types::point_t parametrisation(const typename QuadratureTypes::Points::Node<size
     // количество узлов на каждом элементе завязано на размерность квадратуры
     const int n_nodes{sizeof...(dimention)};
     // вычисление каждой координаты в векторе-параметризации r(l1, ..., ln) через
-    // барицентрически координаты (point)
-    const Types::scalar x = ((element.getNodes()[dimention].Coords()[0] * point[dimention]) + ...) +
-                            element.getNodes()[n_nodes].Coords()[0] * (1 - ((point[dimention]) + ...));
-    const Types::scalar y = ((element.getNodes()[dimention].Coords()[1] * point[dimention]) + ...) +
-                            element.getNodes()[n_nodes].Coords()[1] * (1 - ((point[dimention]) + ...));
-    const Types::scalar z = ((element.getNodes()[dimention].Coords()[2] * point[dimention]) + ...) +
-                            element.getNodes()[n_nodes].Coords()[1] * (1 - ((point[dimention]) + ...));
-    return {x, y, z};
+    // барицентрические координаты (point)
+    return ((Mesh::Utils::getPoint(element.getNodes()[dimention]) * point[dimention]) + ...) +
+                            Mesh::Utils::getPoint(element.getNodes()[n_nodes]) * (1 - ((point[dimention]) + ...));
 }
 
 /*

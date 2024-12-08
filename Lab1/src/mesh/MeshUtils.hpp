@@ -5,6 +5,7 @@
 #include "types/BasicTypes.hpp"
 
 namespace Mesh {
+
 enum CellType {
     cut = 1,
     endocard = 2,
@@ -12,11 +13,7 @@ enum CellType {
     notag = -1,
 };
 
-enum BoundaryType {
-    DIRICHLET = 1,
-    NEUMANN = 2,
-    ROBIN = 3
-};
+enum BoundaryType { DIRICHLET = 1, NEUMANN = 2, ROBIN = 3 };
 
 #define CREATE_EIGEN_COVER(Element, Fucntion)                                                                          \
     inline Types::Vector3d Fucntion(const INMOST::Element &el) {                                                       \
@@ -26,7 +23,6 @@ enum BoundaryType {
     }
 
 namespace Utils {
-
 namespace Face {
 CREATE_EIGEN_COVER(Face, UnitNormal)
 CREATE_EIGEN_COVER(Face, Centroid)
@@ -34,6 +30,10 @@ CREATE_EIGEN_COVER(Face, Centroid)
 
 namespace Cell {
 CREATE_EIGEN_COVER(Cell, Centroid)
+}
+
+Types::point_t inline getPoint(const INMOST::Node &node) {
+    return {node.Coords()[0], node.Coords()[1], node.Coords()[2]};
 }
 
 void fill(const Types::VectorXd &scalarField, INMOST::Mesh &mesh, const std::string &name);
