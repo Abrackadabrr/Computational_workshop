@@ -14,7 +14,7 @@ namespace Math::Integration::QuadratureTypes::Points {
  */
 template <int dim> struct Node {
   using point_t = Types::array_s<dim>;
-  // барицентрические координаты
+  // барицентрические координаты (без последней координаты, которая вычисляется по предыдущим)
   point_t point;
   // веса квадратуры в этих координатах
   Types::scalar weight;
