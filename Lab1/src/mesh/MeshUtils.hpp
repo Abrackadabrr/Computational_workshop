@@ -36,7 +36,9 @@ Types::point_t inline getPoint(const INMOST::Node &node) {
     return {node.Coords()[0], node.Coords()[1], node.Coords()[2]};
 }
 
-void fill(const Types::VectorXd &scalarField, INMOST::Mesh &mesh, const std::string &name);
+void assign_to_nodes(const Types::VectorXd &scalarField, INMOST::Mesh &mesh, const std::string &name);
+
+void assign_to_cells(const Types::VectorXd &scalarField, INMOST::Mesh &mesh, const std::string &name);
 
 Types::scalar norm_over_mesh(const Types::VectorXd &scalarField, INMOST::Mesh &mesh);
 

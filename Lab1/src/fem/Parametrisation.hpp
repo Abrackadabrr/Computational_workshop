@@ -9,19 +9,7 @@
 #include "mesh/MeshUtils.hpp"
 #include "types/BasicTypes.hpp"
 
-namespace FEM {
-/*
- * Надо убедиться обязательно, что глобальная нумерация узлов была проинициализирована
- */
-Types::array<Types::integer, 4> inline getGlobalNumber(const Types::cell_t &cell) {
-    const auto &nodes = cell.getNodes();
-    // Тут появляется порядок узлов, а значит и порядок соотвествующих барицентрических координат:
-    // номер координаты соотвествует номеру вершины.
-    // Мы считаем, что конечные элементы заданы от первых трех координат, а четвертая координата
-    // тривиально выражается через первые три: l4 = 1 - l1 - l2 - l3
-    return {nodes[0].GlobalID(), nodes[1].GlobalID(), nodes[2].GlobalID(), nodes[3].GlobalID()};
-}
-
+namespace FEM::Parametrisation{
 /**
  * Матрица Якоби для аффинного преобразования lambda -> x (референсный элемент -> cell)
  * @param cell ячейка, для которой ищем параметризацию
@@ -45,13 +33,15 @@ decltype(auto) getLocalDOF(const Types::cell_t & cell) {
 }
 
 /**
-* Возвращает пронумерованные степени свободы на ячейке cell
+* Возвращает глобальные номера степеней свободы на ячейке cell
+*
+* Сейчас это работает только для элементов P1
 */
 template<typename BFT>
-Types::array<Types::index, BFT::n> getGlobalNumbersDOF(const Types::cell_t & cell) {
+Types::array<Types::index, BFT::n> getGlobalIndexesOfDOF(const Types::cell_t cell) {
     const auto& dof = getLocalDOF<BFT>(cell);
     assert(dof.size() == BFT::n);
-    const Types::array<Types::index, BFT::n> globalNumbers{};
+    Types::array<Types::index, BFT::n> globalNumbers{};
     for (int i = 0; i < BFT::n; i++) {
         globalNumbers[i] = dof[i].GlobalID();
     }

@@ -6,9 +6,15 @@
 #include "inmost.h"
 
 namespace Mesh::Utils {
-void fill(const Types::VectorXd &scalarField, INMOST::Mesh &mesh, const std::string &name) {
+void assign_to_cells(const Types::VectorXd &scalarField, INMOST::Mesh &mesh, const std::string &name) {
     INMOST::Tag u_tag = mesh.CreateTag(name, INMOST::DATA_REAL, INMOST::CELL, INMOST::NONE, 1);
     for (auto ci = mesh.BeginCell(); ci != mesh.EndCell(); ++ci)
+        ci->Real(u_tag) = scalarField[ci->GlobalID()];
+}
+
+void assign_to_nodes(const Types::VectorXd &scalarField, INMOST::Mesh &mesh, const std::string &name) {
+    INMOST::Tag u_tag = mesh.CreateTag(name, INMOST::DATA_REAL, INMOST::NODE, INMOST::NONE, 1);
+    for (auto ci = mesh.BeginNode(); ci != mesh.EndNode(); ++ci)
         ci->Real(u_tag) = scalarField[ci->GlobalID()];
 }
 

@@ -1,6 +1,6 @@
 add_executable(integration main.cpp)
-add_executable(fvm Lab2/fvm.cpp
-        Lab2/TestFucntions.hpp)
+add_executable(fvm Lab2/fvm.cpp)
+add_executable(fem Lab2/fem.cpp)
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -11,3 +11,5 @@ target_link_libraries(integration PUBLIC ${PROJECT_NAME})
 target_include_directories(integration PUBLIC ../src/)
 target_link_libraries(fvm PUBLIC ${PROJECT_NAME} OpenMP::OpenMP_CXX)
 target_include_directories(fvm PUBLIC ../src/)
+target_link_libraries(fem PUBLIC ${PROJECT_NAME} OpenMP::OpenMP_CXX)
+target_include_directories(fem PUBLIC ../src/)

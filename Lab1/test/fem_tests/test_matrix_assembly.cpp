@@ -25,6 +25,10 @@ class ASSEMBLY : public ::testing::Test {
         mesh.AssignGlobalID(INMOST::CELL);
         mesh.AssignGlobalID(INMOST::NODE);
     }
+
+    Types::scalar c(const Types::point_t& x) {
+        return 0;
+    }
 };
 
 /*
@@ -35,12 +39,12 @@ TEST_F(ASSEMBLY, BASIC_TEST_LOCAL_MATRIX) {
     for (auto ielem = mesh.BeginCell(), end = mesh.EndCell(); ielem != end; ++ielem) {
         const auto id = [&](const Types::point_t &x) -> Types::Matrix3d { return Types::Matrix3d::Identity(); };
 
-        const auto &res = FEM::detail::getSubmatrix<Math::Integration::QuadratureTypes::GaussianPoints<3, 3>,
-                                                    FEM::FiniteElements::P1>(ielem->self(), id);
+        const auto &res = FEM::Assembly::detail::getSubmatrix<Math::Integration::QuadratureTypes::GaussianPoints<3, 3>,
+                                                    FEM::FiniteElements::P1>(ielem->self(), id, c);
         // расчет руками
-        const Types::Matrix3d &A_inverse = FEM::getLocalParametrizationMatrix(ielem->self()).inverse();
+        const Types::Matrix3d &A_inverse = FEM::Parametrisation::getLocalParametrizationMatrix(ielem->self()).inverse();
         const Types::Matrix3d A_inverse_A_inv_tr = A_inverse * A_inverse.transpose();
-        FEM::detail::submatrix<4> expected_res{};
+        FEM::Assembly::detail::submatrix<4> expected_res{};
 
         for (int i = 0; i < 4; ++i) {
             for (int j = 0; j < 4; ++j) {
@@ -62,9 +66,9 @@ TEST_F(ASSEMBLY, BASIC_TEST_LOCAL_MATRIX) {
         ASSERT_NEAR((res - expected_res).norm(), 0, 5e-15);
     }
 }
-
+#if 1
 /**
- * Корректность вычисления локальный матрицы
+ * Корректность вычисления локальной правой части
  */
 TEST_F(ASSEMBLY, BASIC_TEST_LOCAL_RHS) {
     bool a = true;
@@ -72,10 +76,10 @@ TEST_F(ASSEMBLY, BASIC_TEST_LOCAL_RHS) {
         const auto id = [&](const Types::point_t &x) -> Types::scalar { return 1; };
 
         const auto &res =
-            FEM::detail::getSubrhs<Math::Integration::QuadratureTypes::GaussianPoints<3, 3>, FEM::FiniteElements::P1>(
+            FEM::Assembly::detail::getSubrhs<Math::Integration::QuadratureTypes::GaussianPoints<3, 3>, FEM::FiniteElements::P1>(
                 ielem->self(), id);
-        const FEM::detail::subvector<4> expected_res =
-            ielem->Volume() * (1.0 / 4.0) * FEM::detail::subvector<4>{1, 1, 1, 1};
+        const FEM::Assembly::detail::subvector<4> expected_res =
+            ielem->Volume() * (1.0 / 4.0) * FEM::Assembly::detail::subvector<4>{1, 1, 1, 1};
 
         if (a) {
             std::cout << res << std::endl;
@@ -87,3 +91,4 @@ TEST_F(ASSEMBLY, BASIC_TEST_LOCAL_RHS) {
         ASSERT_NEAR((res - expected_res).norm(), 0, 5e-15);
     }
 }
+#endif
