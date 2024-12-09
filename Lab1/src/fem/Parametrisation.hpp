@@ -22,6 +22,10 @@ Types::array<Types::integer, 4> inline getGlobalNumber(const Types::cell_t &cell
     return {nodes[0].GlobalID(), nodes[1].GlobalID(), nodes[2].GlobalID(), nodes[3].GlobalID()};
 }
 
+/**
+ * Матрица Якоби для аффинного преобразования lambda -> x (референсный элемент -> cell)
+ * @param cell ячейка, для которой ищем параметризацию
+ */
 Types::Matrix3d inline getLocalParametrizationMatrix(const Types::cell_t &cell) {
     Types::Matrix3d localMatrix = Types::Matrix3d::Zero();
     const INMOST::ElementArray<INMOST::Node> &nodes = cell.getNodes();
@@ -32,9 +36,26 @@ Types::Matrix3d inline getLocalParametrizationMatrix(const Types::cell_t &cell) 
     return localMatrix;
 }
 
-template<Types::index order>
-decltype(auto) getDegreesOfFreedom(const Types::cell_t & cell) {
+/**
+* Возвращает пронумерованные степени свободы на ячейке cell
+*/
+template<typename BFT>
+decltype(auto) getLocalDOF(const Types::cell_t & cell) {
     return cell.getNodes();
+}
+
+/**
+* Возвращает пронумерованные степени свободы на ячейке cell
+*/
+template<typename BFT>
+Types::array<Types::index, BFT::n> getGlobalNumbersDOF(const Types::cell_t & cell) {
+    const auto& dof = getLocalDOF<BFT>(cell);
+    assert(dof.size() == BFT::n);
+    const Types::array<Types::index, BFT::n> globalNumbers{};
+    for (int i = 0; i < BFT::n; i++) {
+        globalNumbers[i] = dof[i].GlobalID();
+    }
+    return globalNumbers;
 }
 
 }

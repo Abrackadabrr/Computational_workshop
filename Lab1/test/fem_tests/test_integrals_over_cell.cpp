@@ -144,7 +144,79 @@ TEST_F(INTEGRATION, INTEGRATION_BASIC_TEST_WITH_SIMPLE_F_W) {
             FEM::Integration::integrate_over_cell_with_weight<Math::Integration::QuadratureTypes::GaussianPoints<3, 3>>(
                 ielem->self(), l4_q, FEM::FiniteElements::P1::first);
 
-        ASSERT_NEAR(res1, (1./60) * ielem->Volume(), 1e-14) << "Quardatic f linear weight integration failed" << std::endl;
+        ASSERT_NEAR(res1, (1. / 60) * ielem->Volume(), 1e-14)
+            << "Quardatic f linear weight integration failed" << std::endl;
     }
 #endif
 }
+
+TEST_F(INTEGRATION, INTEGRATION_BASIC_TEST_BILINEAR_FORM) {
+    for (auto ielem = mesh.BeginCell(), end = mesh.EndCell(); ielem != end; ++ielem) {
+
+        const auto w1 = [&](const FEM::FiniteElements::Barycentric &b) { return Types::Vector3d{1, 0, 0}; };
+
+        const auto w2 = [&](const FEM::FiniteElements::Barycentric &b) { return Types::Vector3d{0, 1, 0}; };
+
+        const auto id = [&](const Types::point_t &x) -> Types::Matrix3d { return Types::Matrix3d::Identity(); };
+
+        const auto D = [&](const Types::point_t &x) {
+            Types::Matrix3d m = Types::Matrix3d::Zero();
+            m(0, 2) = 1;
+            m(1, 0) = 1;
+            m(2, 1) = 1;
+            return m;
+        };
+
+        const Types::scalar res = FEM::Integration::integrate_bilinear_form_over_cell<
+            Math::Integration::QuadratureTypes::GaussianPoints<3, 3>>(ielem->self(), id, w1, w1);
+        ASSERT_NEAR(res, ielem->Volume(), 1e-15) << "Constant D constant w1 w2 integration failed" << std::endl;
+
+        const Types::scalar res2 = FEM::Integration::integrate_bilinear_form_over_cell<
+            Math::Integration::QuadratureTypes::GaussianPoints<3, 3>>(ielem->self(), D, w1, w2);
+        ASSERT_NEAR(res2, ielem->Volume(), 1e-15) << "Constant D constant w1 w2 integration failed" << std::endl;
+    }
+
+    for (auto ielem = mesh.BeginCell(), end = mesh.EndCell(); ielem != end; ++ielem) {
+
+        const auto w1 = [&](const FEM::FiniteElements::Barycentric &b) -> Types::Vector3d {
+            const auto &m_parametrzation = FEM::getLocalParametrizationMatrix(ielem->self());
+            return m_parametrzation.inverse().transpose() * FEM::FiniteElements::P1::g_first(b);
+        };
+
+        const auto id = [&](const Types::point_t &x) -> Types::Matrix3d { return Types::Matrix3d::Identity(); };
+
+        const Types::scalar res = FEM::Integration::integrate_bilinear_form_over_cell<
+            Math::Integration::QuadratureTypes::GaussianPoints<3, 3>>(
+            ielem->self(), id, FEM::FiniteElements::P1::g_first, FEM::FiniteElements::P1::g_first);
+        ASSERT_NEAR(res, ielem->Volume(), 1e-15) << "Constant D constant w1 w2 integration failed" << std::endl;
+#if 0
+        const Types::scalar res2 = FEM::Integration::integrate_bilinear_form_over_cell<
+            Math::Integration::QuadratureTypes::GaussianPoints<3, 3>>(ielem->self(), id, w1, w1);
+        const Types::scalar expected_res =
+            FEM::getLocalParametrizationMatrix(ielem->self()).inverse().transpose().col(0).squaredNorm();
+        ASSERT_NEAR(res2, expected_res, 1e-15) << "Constant D constant w1 w2 integration failed" << std::endl;
+#endif
+    }
+
+    for (auto ielem = mesh.BeginCell(), end = mesh.EndCell(); ielem != end; ++ielem) {
+
+        const auto l4_q = [&](const Types::point_t &x) -> Types::scalar {
+            const auto &nodes = ielem->getNodes();
+            const Types::Matrix3d &matrix = FEM::getLocalParametrizationMatrix(ielem->self()).inverse();
+            const Types::point_t lambda = matrix * (x - Mesh::Utils::getPoint(nodes[3]));
+            return (1 - lambda.x() - lambda.y() - lambda.z()) * (1 - lambda.x() - lambda.y() - lambda.z());
+        };
+
+        const auto ball_tensor = [&](const Types::point_t &x) -> Types::Matrix3d {
+            return l4_q(x) * Types::Matrix3d::Identity();
+        };
+
+        const Types::scalar res = FEM::Integration::integrate_bilinear_form_over_cell<
+            Math::Integration::QuadratureTypes::GaussianPoints<3, 3>>(
+            ielem->self(), ball_tensor, FEM::FiniteElements::P1::g_first, FEM::FiniteElements::P1::g_first);
+        ASSERT_NEAR(res, (1. / 10) * ielem->Volume(), 1e-15)
+            << "Constant D constant w1 w2 integration failed" << std::endl;
+
+    }
+}
+
