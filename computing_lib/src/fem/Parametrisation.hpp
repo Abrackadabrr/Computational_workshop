@@ -23,49 +23,6 @@ Types::Matrix3d inline getLocalParametrizationMatrix(const Types::cell_t &cell) 
     localMatrix.col(2) = (Mesh::Utils::getPoint(nodes[2]) - last_node);
     return localMatrix;
 }
-
-/*
- * Следующие три функции работают ТОЛЬКО для элементов вида P1, поскольку
- * для них степени свободы совпадают с вершинами элементов
- */
-
-/**
- * Возвращает пронумерованные степени свободы на ячейке cell
- */
-template <typename BFT> decltype(auto) getLocalDOF(const Types::cell_t &cell) { return cell.getNodes(); }
-
-
-template <typename BFT>
-decltype(auto) getLocalIndexesForDOFonFace(const Types::face_t &face, const Types::cell_t &cell) {
-    const auto &local_dof = Mesh::Utils::getArray<Types::node_t>(getLocalDOF<BFT>(cell));
-    // по-хорошему тут должен быть вызов функции, собирающей все степени свободы на грани
-    const auto &face_nodes = Mesh::Utils::getArray<Types::node_t>(face.getNodes());
-
-    // полный перебор
-    Types::array<Types::index, 3> result{};
-    for (int i = 0; i < face_nodes.size(); i++) {
-        const Types::index index =
-            std::distance(local_dof.begin(), std::find(local_dof.begin(), local_dof.end(), face_nodes[i]));
-        result[i] = index;
-    }
-    return result;
-}
-
-/**
- * Возвращает глобальные номера степеней свободы на ячейке cell
- *
- * Сейчас это работает только для элементов P1
- */
-template <typename BFT> Types::array<Types::index, BFT::n> getGlobalIndexesOfDOF(const Types::cell_t& cell) {
-    const auto &dof = getLocalDOF<BFT>(cell);
-    assert(dof.size() == BFT::n);
-    Types::array<Types::index, BFT::n> globalNumbers{};
-    for (int i = 0; i < BFT::n; i++) {
-        globalNumbers[i] = dof[i].GlobalID();
-    }
-    return globalNumbers;
-}
-
 }
 
 #endif //PARAMETRISATION_HPP

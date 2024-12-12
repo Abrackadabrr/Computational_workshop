@@ -8,6 +8,7 @@
 #include "types/BasicTypes.hpp"
 #include "types/MeshTypes.hpp"
 
+#include <fem/assembly/MatrixAssembly.hpp>
 #include <gtest/gtest.h>
 
 using barycentric_v = FEM::FiniteElements::Barycentric::barycentric_v;
@@ -71,7 +72,7 @@ TEST_F(PARAMETRISATION, FACE_NODES_INDEXES) {
     for (auto ielem = mesh.BeginCell(), end = mesh.EndCell(); ielem != mesh.EndCell(); ++ielem) {
         const auto &faces = ielem->getFaces();
         for (int i = 0; i < faces.size(); i++) {
-            const auto &indexes = FEM::Parametrisation::getLocalIndexesForDOFonFace<FEM::FiniteElements::P1>(
+            const auto &indexes = FEM::Assembly::Utils::getLocalIndexesForDOFonFace<FEM::FiniteElements::P1>(
                 faces[i]->self(), ielem->self());
 
             for (int k = 0; k < indexes.size(); k++) {

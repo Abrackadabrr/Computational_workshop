@@ -8,6 +8,8 @@
 #include "fem/Parametrisation.hpp"
 #include "fem/assembly/Integration.hpp"
 #include "fem/finite_elements/FiniteElements.hpp"
+#include "fem/assembly/Utils.hpp"
+
 #include "types/BasicTypes.hpp"
 #include "types/MeshTypes.hpp"
 
@@ -131,35 +133,31 @@ Types::SLAE getSLAE(Types::mesh_t &mesh, const rsh_t &rhs, const d_tensor_t &D, 
     // основной цикл по ячейкам
     for (auto ielem = mesh.BeginCell(), end_cell = mesh.EndCell(); ielem != end_cell; ++ielem) {
         const Types::cell_t cell = ielem->self();
-        const auto &nodes = Parametrisation::getLocalDOF<BFT>(cell);
-        const auto &global_indexes = Parametrisation::getGlobalIndexesOfDOF<BFT>(cell);
+        const auto &dof = Utils::getLocalDOF<BFT>(cell);
+        const auto &global_indexes = Utils::getGlobalIndexesOfDOF<BFT>(cell);
         auto A_sub = detail::getSubmatrix<Quadrature, BFT>(cell, D, c);
 
         const auto &A_sub_copy = A_sub;
         auto rhs_sub = detail::getSubrhs<Quadrature, BFT>(cell, boundary_type, rhs, neumann);
 
-        // обработка граничных условий
-        const auto faces = cell.getFaces();
-        for (auto i_face = faces.begin(), end_face = faces.end(); i_face != end_face; ++i_face) {
-            const Types::face_t &face = i_face->getAsFace();
-            // обработка граничного условия Дирихле
-            if (face.Integer(boundary_type) == Mesh::BoundaryType::DIRICHLET) {
-                // локальные индексы тестовых функций, которые не лежат в необходимом пространстве
-                const auto &local_indexes = Parametrisation::getLocalIndexesForDOFonFace<BFT>(face, cell);
-
-                for (int i = 0; i < local_indexes.size(); i++) {
-                    // i0 -- текущая к рассмотрению неправильная тестовая функция
-                    const auto i0 = local_indexes[i];
-                    // Все строки с неправильными тестовыми функциями должны быть заменены в
-                    // нулевые с единицей на диагонали
-                    for (int k = 0; k < BFT::n; k++) {
-                        A_sub(i0, k) = 0;
-                    }
-                    A_sub(i0, i0) = 1;
-                    // и соотвествующие правые части должны быть равны значению на границе дирихле
-                    rhs_sub[i0] = dirichlet(Mesh::Utils::getPoint(nodes[i0]));
+        // обработка граничного условия Дирихле
+        // Нам нужно проитерироваться по всем "неправильным тестовым функциям"
+        // Давайте проитерируемся по всем тестовым функциям (задана степенями свободы) и поймем какие из них "неправильные"
+        for (Types::index dof_index = 0; dof_index < dof.size(); ++dof_index) {
+            // Далее, мы хотим как-то оценить правильность этой степени свободы
+            if (Utils::isIncorrect(dof[dof_index], boundary_type)) {
+                // делаем модификацию
+                const Types::index i0 = dof_index;
+                // 1) Все строки с неправильными тестовыми функциями должны быть заменены в
+                // нулевые с единицей на диагонали
+                for (int k = 0; k < BFT::n; k++) {
+                    A_sub(i0, k) = 0;
                 }
-#if 1
+                A_sub(i0, i0) = 1;
+                // 2) и соотвествующие правые части должны быть равны значению на границе дирихле
+                rhs_sub[i0] = dirichlet(Mesh::Utils::getPoint(dof[i0]));
+                // Замена уравнений произведена, единтсвенное -- осталось несимметричной матрица
+#if 0
                 // Из оставшихся правильных уравнений нужно выкинуть все слагаемые с известными величинами
                 for (Types::index k = 0; k < BFT::n; k++) {
                     // если я НЕ нашел индекс в массиве local_indexes, то тестовая функция была правильной
