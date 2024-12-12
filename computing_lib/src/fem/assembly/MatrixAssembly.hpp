@@ -7,8 +7,8 @@
 
 #include "fem/Parametrisation.hpp"
 #include "fem/assembly/Integration.hpp"
-#include "fem/finite_elements/FiniteElements.hpp"
 #include "fem/assembly/Utils.hpp"
+#include "fem/finite_elements/FiniteElements.hpp"
 
 #include "types/BasicTypes.hpp"
 #include "types/MeshTypes.hpp"
@@ -46,10 +46,10 @@ decltype(auto) getBasisFunctionCartesianParametrisation(Types::index i, const Ty
 /*
  * @tparam BFT for basis function type
  */
-template <typename Quadrature, typename BFT, typename Callable_D, typename Callable_algebraic>
-submatrix<BFT::n> getSubmatrix(const Types::cell_t &cell, // ячейка, по которой рассчитываем вспомогательную матрицу
-                               const Callable_D &D, // тензор эллиптического оператора
-                               const Callable_algebraic &c // коэффициент при алгебраическом члене
+template <typename Quadrature, typename BFT, typename Callable_D>
+submatrix<BFT::n>
+getSubmatrixGradientPart(const Types::cell_t &cell, // ячейка, по которой рассчитываем вспомогательную матрицу
+                         const Callable_D &D // тензор эллиптического оператора
 ) {
     const Types::index n_Dof = BFT::n;
     submatrix<n_Dof> submatrix{};
@@ -63,14 +63,32 @@ submatrix<BFT::n> getSubmatrix(const Types::cell_t &cell, // ячейка, по 
 
     for (Types::index i = 0; i < n_Dof; i++) {
         for (Types::index j = 0; j < n_Dof; j++) {
+            submatrix(i, j) = Integration::integrate_bilinear_form_over_cell<Quadrature>(
+                cell, tensor, BFT::getGradient(i), BFT::getGradient(j));
+        }
+    }
+    return submatrix;
+}
+
+/*
+ * @tparam BFT for basis function type
+ */
+template <typename Quadrature, typename BFT, typename Callable_algebraic>
+submatrix<BFT::n>
+getSubmatrixAlgebraic(const Types::cell_t &cell, // ячейка, по которой рассчитываем вспомогательную матрицу
+                      const Callable_algebraic &c // коэффициент при алгебраическом члене
+) {
+    const Types::index n_Dof = BFT::n;
+    submatrix<n_Dof> submatrix{};
+
+    for (Types::index i = 0; i < n_Dof; i++) {
+        for (Types::index j = 0; j < n_Dof; j++) {
 
             const auto scalar_weight = [&](const FiniteElements::Barycentric &b) {
                 return BFT::getFunction(i)(b) * BFT::getFunction(j)(b);
             };
 
-            submatrix(i, j) = Integration::integrate_bilinear_form_over_cell<Quadrature>(
-                                  cell, tensor, BFT::getGradient(i), BFT::getGradient(j)) +
-                              Integration::integrate_over_cell_with_weight<Quadrature>(cell, c, scalar_weight);
+            submatrix(i, j) = Integration::integrate_over_cell_with_weight<Quadrature>(cell, c, scalar_weight);
         }
     }
     return submatrix;
@@ -135,14 +153,16 @@ Types::SLAE getSLAE(Types::mesh_t &mesh, const rsh_t &rhs, const d_tensor_t &D, 
         const Types::cell_t cell = ielem->self();
         const auto &dof = Utils::getLocalDOF<BFT>(cell);
         const auto &global_indexes = Utils::getGlobalIndexesOfDOF<BFT>(cell);
-        auto A_sub = detail::getSubmatrix<Quadrature, BFT>(cell, D, c);
+        auto A_sub = detail::getSubmatrixGradientPart<Quadrature, BFT>(cell, D);
+        A_sub += detail::getSubmatrixAlgebraic<Quadrature, BFT>(cell, c);
 
         const auto &A_sub_copy = A_sub;
         auto rhs_sub = detail::getSubrhs<Quadrature, BFT>(cell, boundary_type, rhs, neumann);
 
         // обработка граничного условия Дирихле
         // Нам нужно проитерироваться по всем "неправильным тестовым функциям"
-        // Давайте проитерируемся по всем тестовым функциям (задана степенями свободы) и поймем какие из них "неправильные"
+        // Давайте проитерируемся по всем тестовым функциям (задана степенями свободы) и поймем какие из них
+        // "неправильные"
         for (Types::index dof_index = 0; dof_index < dof.size(); ++dof_index) {
             // Далее, мы хотим как-то оценить правильность этой степени свободы
             if (Utils::isIncorrect(dof[dof_index], boundary_type)) {
@@ -155,29 +175,27 @@ Types::SLAE getSLAE(Types::mesh_t &mesh, const rsh_t &rhs, const d_tensor_t &D, 
                 }
                 A_sub(i0, i0) = 1;
                 // 2) и соотвествующие правые части должны быть равны значению на границе дирихле
-                rhs_sub[i0] = dirichlet(Mesh::Utils::getPoint(dof[i0]));
+                const Types::scalar dirichlet_value = dirichlet(Mesh::Utils::getPoint(dof[i0]));
+                rhs_sub[i0] = dirichlet_value;
                 // Замена уравнений произведена, единтсвенное -- осталось несимметричной матрица
-#if 0
+#if 1
                 // Из оставшихся правильных уравнений нужно выкинуть все слагаемые с известными величинами
-                for (Types::index k = 0; k < BFT::n; k++) {
-                    // если я НЕ нашел индекс в массиве local_indexes, то тестовая функция была правильной
-                    if (std::find(local_indexes.begin(), local_indexes.end(), k) == local_indexes.end()) {
-                        for (Types::index p = 0; p < local_indexes.size(); p++) {
-                            // переношу все в правую часть и зануляю соотвествующие слагаемые в матрице
-                            rhs_sub[k] -= A_sub_copy(k, local_indexes[p]) * rhs_sub[local_indexes[p]];
-                            A_sub(k, local_indexes[p]) = 0;
-                        }
-                    }
+                for (int k = 0; k < BFT::n; k++) {
+                    if (k != i0)
+                        rhs_sub[k] -= A_sub(k, i0) * dirichlet_value;
+                }
+                // Далее я зануляю соотвествующее слагаемое во вспомогательной матрице,
+                // тем самым убирая это слагаемое из расчета коэффициента в итоговой матрице
+                // Также это делатеся для того, чтобы в прерыдущем цикле не происходило вычитание из rhs[i0],
+                // которое уже мы сецчас обработали: его не надо трогать больше
+                for (int k = 0; k < BFT::n; k++) {
+                    if (k != i0)
+                        A_sub(k, i0) = 0;
                 }
 #endif
                 // Все
                 // Уравнения неправильные выкинуты вообще
                 // Уравнения правильные изменены с учетом известных данных
-#if 0
-                    std::cout << rhs_sub << std::endl << std::endl;
-                    std::cout << A_sub << std::endl;
-                    std::cout << "// ---------------- //" << std::endl;
-#endif
             }
         }
 

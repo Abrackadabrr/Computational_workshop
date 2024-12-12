@@ -40,14 +40,21 @@ void assign_to_nodes(const Types::VectorXd &scalarField, INMOST::Mesh &mesh, con
 
 void assign_to_cells(const Types::VectorXd &scalarField, INMOST::Mesh &mesh, const std::string &name);
 
-Types::scalar norm_over_mesh(const Types::VectorXd &scalarField, INMOST::Mesh &mesh);
+template<typename Callable>
+void assign_analytical_to_nodes(const Callable &f, INMOST::Mesh &mesh, const std::string &name) {
+    INMOST::Tag u_tag = mesh.CreateTag(name, INMOST::DATA_REAL, INMOST::NODE, INMOST::NONE, 1);
+    for (auto ci = mesh.BeginNode(); ci != mesh.EndNode(); ++ci)
+        ci->Real(u_tag) = f(Mesh::Utils::getPoint(ci->self()));
+}
 
 template <typename Callable>
-void fill_scalar_with_function(const Callable &func, INMOST::Mesh &mesh, const std::string &name) {
+void assign_analytical_to_cells(const Callable &func, INMOST::Mesh &mesh, const std::string &name) {
     INMOST::Tag u_tag = mesh.CreateTag(name, INMOST::DATA_REAL, INMOST::CELL, INMOST::NONE, 1);
     for (auto ci = mesh.BeginCell(); ci != mesh.EndCell(); ++ci)
         ci->Real(u_tag) = func(Cell::Centroid(ci->self()));
 }
+
+Types::scalar norm_over_mesh(const Types::VectorXd &scalarField, INMOST::Mesh &mesh);
 
 template <typename Callable>
 void fill_vector3d_with_function(const Callable &func, INMOST::Mesh &mesh, const std::string &name) {
@@ -62,6 +69,15 @@ template <typename Callable> Types::VectorXd evaluate_function_over_cells(const 
     int i = 0;
     for (auto ci = mesh.BeginCell(); ci != mesh.EndCell(); ++ci)
         result[i++] = func(Cell::Centroid(ci->self()));
+    return result;
+}
+
+template <typename Callable> Types::VectorXd evaluate_over_nodes(const Callable &func, INMOST::Mesh &mesh) {
+    const int n = mesh.NumberOfNodes();
+    Types::VectorXd result{n};
+    int i = 0;
+    for (auto ci = mesh.BeginNode(); ci != mesh.EndNode(); ++ci)
+        result[i++] = func(ci->self());
     return result;
 }
 
