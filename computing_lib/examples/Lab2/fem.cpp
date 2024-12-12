@@ -13,17 +13,26 @@
 
 #include "mesh/MeshUtils.hpp"
 
-void set_boundary_tag(INMOST::Mesh &mesh) {
+std::vector<unsigned> set_boundary_tag(INMOST::Mesh &mesh) {
     INMOST::Tag u_tag = mesh.CreateTag("Boundary_type", INMOST::DATA_INTEGER, INMOST::FACE, INMOST::NONE, 1);
+    std::vector<unsigned> boundary_nodes;
+    const auto &gmsh_tag = mesh.GetTag("GMSH_TAGS");
     for (auto ci = mesh.BeginFace(); ci != mesh.EndFace(); ++ci) {
         auto face = ci->getAsFace();
         if (face.Boundary()) {
-            const auto tag = face.Integer(mesh.GetTag("GMSH_TAGS"));
-            face.Integer(u_tag) = Mesh::BoundaryType::NEUMANN;
+            const auto nodes = face.getNodes();
+            for (int i = 0; i < nodes.size(); ++i) {
+                boundary_nodes.push_back(nodes[i].GlobalID());
+            }
+            // if (face.Integer(gmsh_tag) == Mesh::cut)
+            //     face.Integer(u_tag) = Mesh::BoundaryType::NEUMANN;
+            // else
+            face.Integer(u_tag) = Mesh::BoundaryType::DIRICHLET;
         } else {
             face.Integer(u_tag) = Mesh::BoundaryType::NOT_BOUNDARY;
         }
     }
+    return boundary_nodes;
 }
 
 Types::scalar evaluate_mean_diameter(INMOST::Mesh &mesh) {
@@ -42,7 +51,7 @@ Types::VectorXd solve(const Types::SLAE &slae) {
     Eigen::setNbThreads(14);
     Eigen::ConjugateGradient<Types::SparseMatrixXd, Eigen::Lower | Eigen::Upper> method;
     method.compute(slae.A);
-    method.setTolerance(1e-10);
+    method.setTolerance(1e-16);
     const Types::VectorXd res = method.solve(slae.b);
     std::cout << method.info() << std::endl;
     std::cout << method.iterations() << std::endl;
@@ -50,15 +59,35 @@ Types::VectorXd solve(const Types::SLAE &slae) {
     return res;
 }
 
+void check_solution(Types::mesh_t &mesh, const std::vector<unsigned>& debug_info,  const Types::SLAE &slae) {
+    Types::index i = 0;
+    for (auto ielem = mesh.BeginNode(); ielem != mesh.EndNode(); ++ielem) {
+        if (ielem->Boundary()) {
+            const unsigned j = ielem->GlobalID();
+            if (std::find(debug_info.begin(), debug_info.end(), j) == debug_info.end()) {
+                std::cout << "Numbering changes unexpectedly" << std::endl;
+            }
+#if 0
+            std::cout << j << std::endl;
+            std::cout << slae.A.row(j) << std::endl << std::endl;
+            std::cout << slae.b[j] << std::endl << std::endl;
+            std::cout << "// ------------------- //" << std::endl;
+            ++i;
+#endif
+        }
+    }
+    std::cout << i << std::endl;
+}
+
 Types::scalar neumann(const Types::point_t &x, const Types::face_t & /*no name*/) { return 1; }
 
-Types::scalar dirichlet(const Types::point_t &x) { return 0; }
+Types::scalar dirichlet(const Types::point_t &x) { return 50; }
 
-Types::scalar rhs(const Types::point_t &x) { return std::sin(x.norm() / 10); }
+Types::scalar rhs(const Types::point_t &x) { return std::sin(x.norm()); }
 
 Types::Matrix3d D(const Types::point_t &x) { return Types::Matrix3d::Identity(); }
 
-Types::scalar c(const Types::point_t &x) { return 5; }
+Types::scalar c(const Types::point_t &x) { return 0; }
 
 int main() {
     INMOST::Mesh mesh{};
@@ -66,23 +95,22 @@ int main() {
         "/home/evgen/Education/MasterDegree/5_level/Chapter_1/INM_RAS/Computing_workshop/Workshop/computing_lib/"
         "examples/Lab2/meshes/2.msh");
     mesh.AssignGlobalID(INMOST::NODE);
-    mesh.AssignGlobalID(INMOST::CELL);
-    set_boundary_tag(mesh);
+    const auto debug_info = set_boundary_tag(mesh);
     std::cout << mesh.NumberOfCells() << std::endl;
     std::cout << mesh.NumberOfNodes() << std::endl;
 
     // решение методом конечных элементов
     const auto slae =
-        FEM::Assembly::getSLAE<Math::Integration::QuadratureTypes::GaussianPoints<3, 1>, FEM::FiniteElements::P1>(
-            mesh, rhs, D, c, neumann);
+        FEM::Assembly::getSLAE<Math::Integration::QuadratureTypes::GaussianPoints<3, 3>, FEM::FiniteElements::P1>(
+            mesh, rhs, D, c, neumann, dirichlet);
     const Types::SparseMatrixXd &matrix = slae.A;
-    std::cout << matrix.rows() << std::endl;
+    std::cout << "Assembled" << std::endl;
 
     // std::cout << matrix.diagonal() << std::endl;
 
     // const Types::scalar det = slae.A.toDense().determinant();
     // std::cout << "Determinant: " << det << std::endl;
-#if 0
+#if 1
     // проверка на самосопряженность
     for (int i = 0; i < slae.A.rows(); ++i) {
         for (int j = 0; j < slae.A.cols(); ++j) {
@@ -97,6 +125,9 @@ int main() {
     const auto res = solve(slae);
 
     Mesh::Utils::assign_to_nodes(res, mesh, "numerical_solution");
+
+    check_solution(mesh, debug_info, slae);
+
     mesh.Save("/home/evgen/Education/MasterDegree/5_level/Chapter_1/INM_RAS/Computing_workshop/Workshop/computing_lib/examples/"
               "results/fem_mesh_2.vtk");
 }

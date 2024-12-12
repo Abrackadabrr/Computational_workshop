@@ -37,10 +37,11 @@ template <typename BFT> decltype(auto) getLocalDOF(const Types::cell_t &cell) { 
 
 template <typename BFT>
 decltype(auto) getLocalIndexesForDOFonFace(const Types::face_t &face, const Types::cell_t &cell) {
-    const auto &local_dof = Mesh::Utils::getArray<Types::node_t>(cell.getNodes());
-    const auto &face_nodes = face.getNodes();
+    const auto &local_dof = Mesh::Utils::getArray<Types::node_t>(getLocalDOF<BFT>(cell));
+    // по-хорошему тут должен быть вызов функции, собирающей все степени свободы на грани
+    const auto &face_nodes = Mesh::Utils::getArray<Types::node_t>(face.getNodes());
 
-    // полныйп перебор
+    // полный перебор
     Types::array<Types::index, 3> result{};
     for (int i = 0; i < face_nodes.size(); i++) {
         const Types::index index =
@@ -55,7 +56,7 @@ decltype(auto) getLocalIndexesForDOFonFace(const Types::face_t &face, const Type
  *
  * Сейчас это работает только для элементов P1
  */
-template <typename BFT> Types::array<Types::index, BFT::n> getGlobalIndexesOfDOF(const Types::cell_t cell) {
+template <typename BFT> Types::array<Types::index, BFT::n> getGlobalIndexesOfDOF(const Types::cell_t& cell) {
     const auto &dof = getLocalDOF<BFT>(cell);
     assert(dof.size() == BFT::n);
     Types::array<Types::index, BFT::n> globalNumbers{};
