@@ -15,7 +15,9 @@ message(STATUS "LIB_DIR: ${INMOST_LIBRARY_DIR}")
 
 add_library(${PROJECT_NAME} ${SOURCES}
         fem/assembly/Utils.hpp
-        fem/time_discretisation/TimeDiscretisation.hpp)
+        fem/time_discretisation/TimeDiscretisation.hpp
+        fem/time_discretisation/ImplicitEuler.hpp
+        auxilary/SchemeParameters.hpp)
 
 target_compile_definitions(inmost PUBLIC ${INMOST_DEFINITIONS})
 target_link_directories(inmost INTERFACE ${INMOST_LIBRARY_DIRS})

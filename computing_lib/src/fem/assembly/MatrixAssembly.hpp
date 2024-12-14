@@ -22,12 +22,6 @@ namespace detail {
 template <unsigned int N> using submatrix = Eigen::Matrix<Types::scalar, N, N>;
 template <unsigned int N> using subvector = Eigen::Vector<Types::scalar, N>;
 
-template <typename BFT> Types::index getNumberOfDOF(const Types::mesh_t &mesh);
-
-template <> inline Types::index getNumberOfDOF<FiniteElements::P1>(const Types::mesh_t &mesh) {
-    return mesh.NumberOfNodes();
-}
-
 /**
  * Рассчитывает локальное выражение базисной функции на ячейке в декартовых координатах
  * @tparam BFT
@@ -138,12 +132,13 @@ template <typename Quadrature, typename BFT, typename rsh_t, typename d_tensor_t
 Types::SLAE getSLAE(Types::mesh_t &mesh, const rsh_t &rhs, const d_tensor_t &D, const algebraic_t &c,
                     const neumann_t &neumann, const dirichlet_t &dirichlet) {
     // результаты, которые будем заполнять
-    Types::SparseMatrixXd matrix{detail::getNumberOfDOF<BFT>(mesh), detail::getNumberOfDOF<BFT>(mesh)};
-    Types::VectorXd rhs_res = Types::VectorXd::Zero(detail::getNumberOfDOF<BFT>(mesh));
+    const Types::index n_dofs = FiniteElements::getNumberOfDOF<BFT>(mesh);
+    Types::SparseMatrixXd matrix{n_dofs, n_dofs};
+    Types::VectorXd rhs_res = Types::VectorXd::Zero(n_dofs);
 
     // триплеты для задания разреженной матрицы
     Types::vector<Eigen::Triplet<Types::scalar>> triplets;
-    triplets.reserve(mesh.NumberOfCells() * BFT::n * BFT::n);
+    triplets.reserve(n_dofs * BFT::n * BFT::n);
 
     // тэг для характеристики граничного условия
     const INMOST::Tag &boundary_type = mesh.GetTag("Boundary_type");
@@ -156,7 +151,6 @@ Types::SLAE getSLAE(Types::mesh_t &mesh, const rsh_t &rhs, const d_tensor_t &D, 
         auto A_sub = detail::getSubmatrixGradientPart<Quadrature, BFT>(cell, D);
         A_sub += detail::getSubmatrixAlgebraic<Quadrature, BFT>(cell, c);
 
-        const auto &A_sub_copy = A_sub;
         auto rhs_sub = detail::getSubrhs<Quadrature, BFT>(cell, boundary_type, rhs, neumann);
 
         // обработка граничного условия Дирихле

@@ -77,6 +77,13 @@ struct P2 {
     static constexpr unsigned n = 10;
 };
 
+
+template <typename BFT> Types::index getNumberOfDOF(const Types::mesh_t &mesh);
+
+template <> inline Types::index getNumberOfDOF<FiniteElements::P1>(const Types::mesh_t &mesh) {
+    return mesh.NumberOfNodes();
+}
+
 }
 
 #endif
